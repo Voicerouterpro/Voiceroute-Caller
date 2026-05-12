@@ -1,4 +1,4 @@
-# MEDUSA — IVR System v1.0
+# Voiceroute — IVR System v1.0
 
 Multi-profile PIN-based inbound IVR powered by SignalWire.
 
@@ -26,7 +26,7 @@ Set your phone number's call handler to:
 
 ## Project Structure
 ```
-medusa/
+Voiceroute
 ├── server.js
 ├── .env.example
 ├── config/
