@@ -1,0 +1,9 @@
+[
+  {
+    "id": "9db536b9-1713-4580-badf-87358955f057",
+    "username": "superadmin",
+    "passwordHash": "$2a$10$yQ1.pD9/efTgt78/r/Cxiuo7CMKNqMTQWg7bL03EgDTEkRHeq6Ide",
+    "role": "superadmin",
+    "createdAt": "2026-04-29T19:49:59.414Z"
+  }
+]

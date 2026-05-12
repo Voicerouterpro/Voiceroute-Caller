@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MEDUSA — IVR Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#06080d;--surface:#0b1018;--surface2:#0f1520;--surface3:#131d2a;
+  --border:#1a2d42;--border2:#243650;
+  --accent:#7c3aed;--accent-light:#a855f7;--accent-glow:rgba(124,58,237,0.2);
+  --green:#10b981;--green-dim:rgba(16,185,129,0.12);
+  --red:#ef4444;--red-dim:rgba(239,68,68,0.12);
+  --yellow:#f59e0b;--yellow-dim:rgba(245,158,11,0.12);
+  --blue:#3b82f6;--blue-dim:rgba(59,130,246,0.12);
+  --text:#a8c0d8;--text-dim:#2d4a65;--text-mid:#5a7a9a;--text-bright:#e2f0ff;
+  --mono:'IBM Plex Mono',monospace;--sans:'Syne',sans-serif;
+  --r:10px;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 20% 0%,rgba(124,58,237,0.08) 0%,transparent 60%),radial-gradient(ellipse at 80% 100%,rgba(59,130,246,0.05) 0%,transparent 60%);pointer-events:none;z-index:0}
+
+/* ── LOGIN ─────────────────────────────────────────── */
+#login-screen{position:fixed;inset:0;background:var(--bg);z-index:200;display:flex;align-items:center;justify-content:center}
+.login-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:48px 40px;width:400px;text-align:center;position:relative;overflow:hidden}
+.login-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--accent-light))}
+.login-logo{font-size:28px;font-weight:800;letter-spacing:0.12em;color:var(--text-bright);margin-bottom:4px}
+.login-logo span{color:var(--accent-light)}
+.login-sub{font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-bottom:32px;letter-spacing:0.1em}
+.login-err{color:var(--red);font-size:12px;margin-top:12px;display:none;font-family:var(--mono)}
+
+/* ── LAYOUT ────────────────────────────────────────── */
+#app{position:relative;z-index:1;display:none;grid-template-columns:248px 1fr;grid-template-rows:58px 1fr;min-height:100vh}
+#app.visible{display:grid}
+
+/* ── HEADER ────────────────────────────────────────── */
+header{grid-column:1/-1;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 28px;gap:14px}
+.logo{font-size:18px;font-weight:800;letter-spacing:0.1em;color:var(--text-bright)}
+.logo span{color:var(--accent-light)}
+.chip{font-family:var(--mono);font-size:10px;padding:3px 10px;border-radius:99px;border:1px solid var(--border2);color:var(--text-mid)}
+.chip.live{border-color:var(--green);color:var(--green);animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+#hdr-user{margin-left:auto;display:flex;align-items:center;gap:10px}
+#hdr-username{font-family:var(--mono);font-size:11px;color:var(--text-mid)}
+#hdr-role{font-family:var(--mono);font-size:9px;padding:2px 8px;border-radius:99px;background:var(--accent-glow);color:var(--accent-light);border:1px solid var(--accent)}
+.logout-btn{font-family:var(--mono);font-size:11px;padding:5px 12px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text-dim);cursor:pointer;transition:all .15s}
+.logout-btn:hover{border-color:var(--red);color:var(--red)}
+
+/* ── SIDEBAR ───────────────────────────────────────── */
+nav{background:var(--surface);border-right:1px solid var(--border);padding:16px 0;display:flex;flex-direction:column}
+.nav-grp{padding:10px 18px 4px;font-size:9px;font-family:var(--mono);letter-spacing:.15em;color:var(--text-dim);text-transform:uppercase}
+.nav-item{display:flex;align-items:center;gap:10px;padding:11px 20px;font-size:13px;font-weight:600;color:var(--text-mid);cursor:pointer;border-left:3px solid transparent;transition:all .15s;user-select:none}
+.nav-item:hover{color:var(--text-bright);background:rgba(124,58,237,.05)}
+.nav-item.active{color:var(--accent-light);border-left-color:var(--accent);background:rgba(124,58,237,.08)}
+.nav-item .ni{font-size:16px;width:20px;text-align:center}
+.nbadge{margin-left:auto;font-family:var(--mono);font-size:10px;padding:1px 8px;border-radius:99px;background:var(--surface3);border:1px solid var(--border);color:var(--text-dim)}
+.nav-item.superonly{display:none}
+.superadmin .nav-item.superonly{display:flex}
+
+/* ── MAIN ──────────────────────────────────────────── */
+main{padding:28px 32px;overflow-y:auto;display:flex;flex-direction:column;gap:24px}
+.page{display:none;flex-direction:column;gap:22px}
+.page.active{display:flex}
+.page-hdr{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.page-title{font-size:22px;font-weight:800;color:var(--text-bright)}
+.page-sub{font-size:11px;color:var(--text-dim);font-family:var(--mono);margin-top:3px}
+
+/* ── CARDS ─────────────────────────────────────────── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.card-hdr{padding:16px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.card-title{font-size:13px;font-weight:700;color:var(--text-bright);display:flex;align-items:center;gap:8px}
+.card-body{padding:22px}
+
+/* ── STATS ─────────────────────────────────────────── */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px 20px;position:relative;overflow:hidden}
+.stat::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--accent)}
+.stat.g::after{background:var(--green)}.stat.r::after{background:var(--red)}.stat.y::after{background:var(--yellow)}.stat.b::after{background:var(--blue)}
+.stat-lbl{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--text-dim);margin-bottom:8px}
+.stat-val{font-size:26px;font-weight:800;color:var(--text-bright);line-height:1}
+
+/* ── FORMS ─────────────────────────────────────────── */
+.field{margin-bottom:16px}.field:last-child{margin-bottom:0}
+label{display:block;font-size:11px;font-weight:700;color:var(--text-mid);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;font-family:var(--mono)}
+label .hint{font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-dim);margin-left:6px}
+input[type=text],input[type=password],input[type=number],select,textarea{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:10px 14px;color:var(--text-bright);font-family:var(--sans);font-size:13px;outline:none;transition:border-color .15s,box-shadow .15s;resize:vertical}
+input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+textarea{min-height:80px;line-height:1.6}
+select option{background:var(--surface2)}
+.char-ct{font-family:var(--mono);font-size:10px;color:var(--text-dim);text-align:right;margin-top:3px}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+
+/* ── BUTTONS ───────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;gap:7px;padding:10px 18px;border-radius:7px;font-family:var(--sans);font-size:13px;font-weight:700;cursor:pointer;border:none;outline:none;transition:all .15s}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:var(--accent-light)}
+.btn-success{background:var(--green);color:#fff}.btn-success:hover{filter:brightness(1.1)}
+.btn-danger{background:transparent;border:1px solid var(--red);color:var(--red)}.btn-danger:hover{background:var(--red-dim)}
+.btn-ghost{background:transparent;border:1px solid var(--border2);color:var(--text-mid)}.btn-ghost:hover{border-color:var(--accent-light);color:var(--accent-light)}
+.btn-sm{padding:6px 12px;font-size:11px}
+.btn-xs{padding:4px 9px;font-size:10px}
+
+/* ── TABLE ─────────────────────────────────────────── */
+.tbl{width:100%;border-collapse:collapse;font-size:12px}
+.tbl th{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-dim);padding:10px 16px;text-align:left;border-bottom:1px solid var(--border);background:var(--surface2)}
+.tbl td{padding:11px 16px;border-bottom:1px solid rgba(26,45,66,.5);font-family:var(--mono);font-size:11px;color:var(--text)}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:rgba(124,58,237,.03)}
+.tbl .actions{display:flex;gap:5px}
+
+/* ── BADGES ────────────────────────────────────────── */
+.badge{display:inline-block;padding:2px 9px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.04em;font-family:var(--mono)}
+.badge.success{background:var(--green-dim);color:var(--green)}
+.badge.fail{background:var(--red-dim);color:var(--red)}
+.badge.info{background:var(--blue-dim);color:var(--blue)}
+.badge.warn{background:var(--yellow-dim);color:var(--yellow)}
+.badge.purple{background:var(--accent-glow);color:var(--accent-light)}
+
+/* ── MODAL ─────────────────────────────────────────── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);z-index:50;display:none;align-items:center;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:var(--r);width:540px;max-width:96vw;max-height:90vh;overflow-y:auto}
+.modal-hdr{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-size:16px;font-weight:800;color:var(--text-bright)}
+.modal-x{width:30px;height:30px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text-mid);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center}
+.modal-x:hover{border-color:var(--red);color:var(--red)}
+.modal-body{padding:24px}
+.modal-foot{padding:14px 24px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+
+/* ── PROFILE DETAIL ────────────────────────────────── */
+.profile-detail{display:flex;flex-direction:column;gap:20px}
+.profile-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.meta-box{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px}
+.meta-lbl{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-dim);margin-bottom:5px}
+.meta-val{font-size:14px;font-weight:700;color:var(--text-bright)}
+
+.msg-list{display:flex;flex-direction:column;gap:10px}
+.msg-item{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start}
+.msg-num{width:26px;height:26px;background:var(--accent-glow);border:1px solid var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;color:var(--accent-light);flex-shrink:0;margin-top:2px}
+.msg-content{flex:1}
+.msg-label{font-family:var(--mono);font-size:10px;color:var(--accent-light);margin-bottom:4px;text-transform:uppercase;letter-spacing:.08em}
+.msg-text{font-size:13px;color:var(--text-bright);line-height:1.6}
+.msg-actions{display:flex;gap:5px;flex-shrink:0}
+
+/* ── FLOW PREVIEW ──────────────────────────────────── */
+.flow{display:flex;flex-direction:column}
+.flow-step{display:flex;gap:14px;position:relative}
+.flow-step::before{content:'';position:absolute;left:16px;top:36px;bottom:-8px;width:2px;background:var(--border)}
+.flow-step:last-child::before{display:none}
+.flow-dot{width:34px;height:34px;border-radius:50%;border:2px solid var(--border2);background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;position:relative;z-index:1;margin-top:2px}
+.flow-body{padding-bottom:22px;flex:1}
+.flow-lbl{font-family:var(--mono);font-size:9px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px}
+.flow-txt{font-size:13px;color:var(--text-bright);background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:9px 13px;font-style:italic;line-height:1.6}
+
+/* ── TOAST ─────────────────────────────────────────── */
+#toast{position:fixed;bottom:24px;right:24px;padding:11px 18px;border-radius:8px;font-size:13px;font-weight:600;z-index:999;opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:none}
+#toast.show{opacity:1;transform:translateY(0)}
+#toast.success{background:var(--green);color:#fff}
+#toast.error{background:var(--red);color:#fff}
+#toast.info{background:var(--accent);color:#fff}
+
+.empty{text-align:center;padding:44px 20px;color:var(--text-dim);font-family:var(--mono);font-size:12px}
+.empty .ei{font-size:28px;margin-bottom:10px;opacity:.25}
+.pin-wrap{position:relative}
+.pin-wrap input{padding-right:38px}
+.pin-eye{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:14px}
+.divider{height:1px;background:var(--border);margin:16px 0}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">M<span>EDUSA</span></div>
+    <div class="login-sub">IVR ADMIN SYSTEM • SIGNALWIRE</div>
+    <div class="field">
+      <label>Username</label>
+      <input type="text" id="li-user" placeholder="Enter username" autocomplete="username"/>
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="li-pass" placeholder="Enter password" autocomplete="current-password"/>
+    </div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:4px" onclick="doLogin()">Sign In →</button>
+    <div class="login-err" id="li-err">Invalid username or password</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <!-- Header -->
+  <header>
+    <div class="logo">M<span>EDUSA</span></div>
+    <div class="chip">SignalWire</div>
+    <div class="chip live">● LIVE</div>
+    <div id="hdr-user">
+      <span id="hdr-username"></span>
+      <span id="hdr-role"></span>
+      <button class="logout-btn" onclick="doLogout()">Sign Out</button>
+    </div>
+  </header>
+
+  <!-- Sidebar -->
+  <nav id="sidebar">
+    <div class="nav-grp">Monitor</div>
+    <div class="nav-item active" onclick="goPage('dashboard',this)"><span class="ni">📊</span>Dashboard</div>
+    <div class="nav-item" onclick="goPage('calls',this)"><span class="ni">📋</span>Call Log<span class="nbadge" id="nb-calls">0</span></div>
+    <div class="nav-grp" style="margin-top:10px">Manage</div>
+    <div class="nav-item" onclick="goPage('profiles',this)"><span class="ni">👤</span>Profiles<span class="nbadge" id="nb-profiles">0</span></div>
+    <div class="nav-item" onclick="goPage('messages',this)"><span class="ni">💬</span>IVR Messages</div>
+    <div class="nav-grp nav-grp-super" style="margin-top:10px;display:none">Admin</div>
+    <div class="nav-item superonly" onclick="goPage('users',this)"><span class="ni">🔑</span>Admin Users</div>
+    <div class="nav-grp" style="margin-top:10px">Help</div>
+    <div class="nav-item" onclick="goPage('setup',this)"><span class="ni">⚙️</span>Setup Guide</div>
+  </nav>
+
+  <!-- Main -->
+  <main>
+
+    <!-- DASHBOARD -->
+    <div id="page-dashboard" class="page active">
+      <div class="page-hdr">
+        <div><div class="page-title">Dashboard</div><div class="page-sub">MEDUSA IVR System Overview</div></div>
+        <button class="btn btn-ghost btn-sm" onclick="loadAll()">↻ Refresh</button>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="stat-lbl">Total Profiles</div><div class="stat-val" id="st-profiles">—</div></div>
+        <div class="stat b"><div class="stat-lbl">Total Calls</div><div class="stat-val" id="st-calls">—</div></div>
+        <div class="stat g"><div class="stat-lbl">Verified</div><div class="stat-val" id="st-verified">—</div></div>
+        <div class="stat r"><div class="stat-lbl">Failed PINs</div><div class="stat-val" id="st-failed">—</div></div>
+      </div>
+      <div class="card">
+        <div class="card-hdr"><div class="card-title">📞 Live Call Flow Preview</div></div>
+        <div class="card-body">
+          <div class="flow">
+            <div class="flow-step"><div class="flow-dot">📲</div><div class="flow-body"><div class="flow-lbl">Step 1 — Welcome</div><div class="flow-txt" id="pv-welcome">Loading…</div></div></div>
+            <div class="flow-step"><div class="flow-dot">🔢</div><div class="flow-body"><div class="flow-lbl">Step 2 — Menu</div><div class="flow-txt" id="pv-menu">Loading…</div></div></div>
+            <div class="flow-step"><div class="flow-dot">🏦</div><div class="flow-body"><div class="flow-lbl">Step 3 — Account Number</div><div class="flow-txt" id="pv-account">Loading…</div></div></div>
+            <div class="flow-step"><div class="flow-dot">🔐</div><div class="flow-body"><div class="flow-lbl">Step 4 — PIN</div><div class="flow-txt" id="pv-pin">Loading…</div></div></div>
+            <div class="flow-step"><div class="flow-dot">✅</div><div class="flow-body"><div class="flow-lbl">Step 5 — Messages Played</div><div class="flow-txt" style="color:var(--green)">→ All personalized messages for that profile are played in order</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CALL LOG -->
+    <div id="page-calls" class="page">
+      <div class="page-hdr">
+        <div><div class="page-title">Call Log</div><div class="page-sub">All inbound activity</div></div>
+        <button class="btn btn-ghost btn-sm" onclick="loadCalls()">↻ Refresh</button>
+      </div>
+      <div class="card"><div id="calls-wrap"><div class="empty"><div class="ei">📵</div>No calls yet</div></div></div>
+    </div>
+
+    <!-- PROFILES -->
+    <div id="page-profiles" class="page">
+      <div class="page-hdr">
+        <div><div class="page-title">Caller Profiles</div><div class="page-sub">Each profile = one caller with Account Number + PIN + Messages</div></div>
+        <button class="btn btn-primary" onclick="openProfileModal()">＋ New Profile</button>
+      </div>
+      <div class="card"><div id="profiles-wrap"><div class="empty"><div class="ei">👤</div>No profiles yet</div></div></div>
+    </div>
+
+    <!-- IVR MESSAGES -->
+    <div id="page-messages" class="page">
+      <div class="page-hdr">
+        <div><div class="page-title">IVR Messages</div><div class="page-sub">Type exactly what callers will hear at each step</div></div>
+      </div>
+      <div class="card">
+        <div class="card-hdr"><div class="card-title">💬 Configure Voice Prompts</div></div>
+        <div class="card-body">
+          <div class="field"><label>Welcome Message <span class="hint">— first thing caller hears</span></label><textarea id="cfg-welcome" oninput="cc(this,'wc')"></textarea><div class="char-ct"><span id="wc">0</span> chars</div></div>
+          <div class="field"><label>Menu Prompt <span class="hint">— after welcome</span></label><textarea id="cfg-menu" oninput="cc(this,'mc')"></textarea><div class="char-ct"><span id="mc">0</span> chars</div></div>
+          <div class="field"><label>Account Number Prompt <span class="hint">— after pressing 1</span></label><textarea id="cfg-account" oninput="cc(this,'ac')"></textarea><div class="char-ct"><span id="ac">0</span> chars</div></div>
+          <div class="field"><label>PIN Prompt <span class="hint">— after account number accepted</span></label><textarea id="cfg-pin" oninput="cc(this,'pc')"></textarea><div class="char-ct"><span id="pc">0</span> chars</div></div>
+          <div class="field"><label>Invalid Account Message</label><textarea id="cfg-inv-acct" oninput="cc(this,'iac')"></textarea><div class="char-ct"><span id="iac">0</span> chars</div></div>
+          <div class="field"><label>Wrong PIN Message</label><textarea id="cfg-inv-pin" oninput="cc(this,'ipc')"></textarea><div class="char-ct"><span id="ipc">0</span> chars</div></div>
+          <div class="field"><label>Final Failure Message <span class="hint">— after max failed attempts</span></label><textarea id="cfg-final" oninput="cc(this,'fc')"></textarea><div class="char-ct"><span id="fc">0</span> chars</div></div>
+          <div class="field"><label>Max Attempts <span class="hint">— before hanging up (1–5)</span></label><input type="number" id="cfg-attempts" min="1" max="5" style="width:90px"/></div>
+          <div style="margin-top:8px"><button class="btn btn-success" onclick="saveConfig()">💾 Save Messages</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ADMIN USERS (super admin only) -->
+    <div id="page-users" class="page">
+      <div class="page-hdr">
+        <div><div class="page-title">Admin Users</div><div class="page-sub">Manage who can access MEDUSA</div></div>
+        <button class="btn btn-primary" onclick="openUserModal()">＋ Add User</button>
+      </div>
+      <div class="card"><div id="users-wrap"><div class="empty"><div class="ei">🔑</div>No users</div></div></div>
+    </div>
+
+    <!-- SETUP -->
+    <div id="page-setup" class="page">
+      <div class="page-hdr"><div><div class="page-title">Setup Guide</div></div></div>
+      <div class="card">
+        <div class="card-body">
+          <div class="flow">
+            <div class="flow-step"><div class="flow-dot">1️⃣</div><div class="flow-body"><div class="flow-lbl">Install</div><div class="flow-txt">Run <code style="background:var(--surface3);padding:1px 6px;border-radius:4px;font-family:var(--mono);font-size:12px">npm install</code>, copy <code style="background:var(--surface3);padding:1px 6px;border-radius:4px;font-family:var(--mono);font-size:12px">.env.example</code> → <code style="background:var(--surface3);padding:1px 6px;border-radius:4px;font-family:var(--mono);font-size:12px">.env</code> and set your SignalWire credentials and JWT_SECRET.</div></div></div>
+            <div class="flow-step"><div class="flow-dot">2️⃣</div><div class="flow-body"><div class="flow-lbl">Start Server</div><div class="flow-txt">Run <code style="background:var(--surface3);padding:1px 6px;border-radius:4px;font-family:var(--mono);font-size:12px">npm start</code> in VS Code terminal. Keep this terminal open.</div></div></div>
+            <div class="flow-step"><div class="flow-dot">3️⃣</div><div class="flow-body"><div class="flow-lbl">Expose Publicly</div><div class="flow-txt">Run <code style="background:var(--surface3);padding:1px 6px;border-radius:4px;font-family:var(--mono);font-size:12px">ngrok http 3000</code> in a second terminal. Copy the HTTPS URL.</div></div></div>
+            <div class="flow-step"><div class="flow-dot">4️⃣</div><div class="flow-body"><div class="flow-lbl">SignalWire Webhook</div><div class="flow-txt">In SignalWire → Phone Numbers → your number → LaML Webhooks → set URL to <code style="background:var(--surface3);padding:1px 6px;border-radius:4px;font-family:var(--mono);font-size:12px">https://your-ngrok-url/ivr/welcome</code> (POST)</div></div></div>
+            <div class="flow-step"><div class="flow-dot">5️⃣</div><div class="flow-body"><div class="flow-lbl">Type Your Messages</div><div class="flow-txt">Go to IVR Messages and type what callers will hear at each step.</div></div></div>
+            <div class="flow-step"><div class="flow-dot">6️⃣</div><div class="flow-body"><div class="flow-lbl">Add Caller Profiles</div><div class="flow-txt">Go to Profiles → New Profile. Enter name, account number, PIN, and add messages they'll hear after verification.</div></div></div>
+            <div class="flow-step"><div class="flow-dot">7️⃣</div><div class="flow-body"><div class="flow-lbl">Test!</div><div class="flow-txt">Call your SignalWire number → hear welcome → press 1 → enter account number # → enter PIN # → hear personalized messages.</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- PROFILE MODAL -->
+<div class="overlay" id="profile-modal">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title" id="pm-title">New Profile</div><button class="modal-x" onclick="closeModal('profile-modal')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="pm-id"/>
+      <div class="field-row">
+        <div class="field"><label>Full Name</label><input type="text" id="pm-name" placeholder="e.g. John Smith"/></div>
+        <div class="field"><label>Account Number <span class="hint">unique</span></label><input type="text" id="pm-acct" placeholder="e.g. 100001"/></div>
+      </div>
+      <div class="field">
+        <label>PIN <span class="hint">unique — caller enters this after account number</span></label>
+        <div class="pin-wrap"><input type="password" id="pm-pin" placeholder="e.g. 4729" maxlength="10"/><button class="pin-eye" onclick="togglePin('pm-pin')">👁</button></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('profile-modal')">Cancel</button>
+      <button class="btn btn-success" onclick="saveProfile()">Save Profile</button>
+    </div>
+  </div>
+</div>
+
+<!-- PROFILE DETAIL MODAL (messages) -->
+<div class="overlay" id="detail-modal">
+  <div class="modal" style="width:620px">
+    <div class="modal-hdr"><div class="modal-title" id="dm-title">Profile Details</div><button class="modal-x" onclick="closeModal('detail-modal')">✕</button></div>
+    <div class="modal-body">
+      <div id="dm-body"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD MESSAGE MODAL -->
+<div class="overlay" id="msg-modal">
+  <div class="modal" style="width:500px">
+    <div class="modal-hdr"><div class="modal-title" id="mm-title">Add Message</div><button class="modal-x" onclick="closeModal('msg-modal')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="mm-profile-id"/>
+      <input type="hidden" id="mm-msg-id"/>
+      <div class="field"><label>Label <span class="hint">— for your reference (e.g. "Balance", "Due Date")</span></label><input type="text" id="mm-label" placeholder="e.g. Account Balance"/></div>
+      <div class="field"><label>Message <span class="hint">— exactly what the caller will hear</span></label><textarea id="mm-text" oninput="cc(this,'mm-c')" placeholder="e.g. Your current account balance is five hundred dollars and twenty five cents."></textarea><div class="char-ct"><span id="mm-c">0</span> chars</div></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('msg-modal')">Cancel</button>
+      <button class="btn btn-success" onclick="saveMessage()">Save Message</button>
+    </div>
+  </div>
+</div>
+
+<!-- USER MODAL -->
+<div class="overlay" id="user-modal">
+  <div class="modal" style="width:420px">
+    <div class="modal-hdr"><div class="modal-title" id="um-title">Add Admin User</div><button class="modal-x" onclick="closeModal('user-modal')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="um-id"/>
+      <div class="field"><label>Username</label><input type="text" id="um-username" placeholder="e.g. jsmith"/></div>
+      <div class="field"><label>Password</label><div class="pin-wrap"><input type="password" id="um-password" placeholder="Enter password"/><button class="pin-eye" onclick="togglePin('um-password')">👁</button></div></div>
+      <div class="field" id="um-role-field"><label>Role</label>
+        <select id="um-role"><option value="admin">Admin</option><option value="superadmin">Super Admin</option></select>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('user-modal')">Cancel</button>
+      <button class="btn btn-success" onclick="saveUser()">Save User</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────
+let TOKEN = localStorage.getItem('medusa_token') || '';
+let CURRENT_USER = null;
+let PROFILES = [];
+let DETAIL_PROFILE_ID = null;
+
+// ── Login ─────────────────────────────────────────────────────
+document.getElementById('li-pass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+document.getElementById('li-user').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+
+async function doLogin() {
+  const username = document.getElementById('li-user').value.trim();
+  const password = document.getElementById('li-pass').value;
+  try {
+    const r = await fetch('/api/auth/login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ username, password })
+    });
+    const d = await r.json();
+    if (!r.ok) { document.getElementById('li-err').style.display='block'; return; }
+    TOKEN = d.token;
+    CURRENT_USER = d.user;
+    localStorage.setItem('medusa_token', TOKEN);
+    bootApp();
+  } catch {
+    document.getElementById('li-err').style.display='block';
+  }
+}
+
+function doLogout() {
+  TOKEN = ''; CURRENT_USER = null;
+  localStorage.removeItem('medusa_token');
+  location.reload();
+}
+
+async function tryAutoLogin() {
+  if (!TOKEN) return;
+  try {
+    const r = await apiFetch('GET', '/api/auth/me');
+    if (r.ok) { CURRENT_USER = await r.json(); bootApp(); }
+    else { TOKEN = ''; localStorage.removeItem('medusa_token'); }
+  } catch { TOKEN = ''; }
+}
+
+function bootApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').classList.add('visible');
+  document.getElementById('hdr-username').textContent = CURRENT_USER.username;
+  document.getElementById('hdr-role').textContent = CURRENT_USER.role === 'superadmin' ? 'Super Admin' : 'Admin';
+  if (CURRENT_USER.role === 'superadmin') {
+    document.getElementById('sidebar').classList.add('superadmin');
+    document.querySelector('.nav-grp-super').style.display = 'block';
+  }
+  loadAll();
+  setInterval(loadAll, 15000);
+  tick(); setInterval(tick, 1000);
+}
+
+// ── API ───────────────────────────────────────────────────────
+async function apiFetch(method, path, body) {
+  const opts = { method, headers: { 'Content-Type':'application/json', 'Authorization': `Bearer ${TOKEN}` } };
+  if (body) opts.body = JSON.stringify(body);
+  return fetch(path, opts);
+}
+
+// ── Toast ─────────────────────────────────────────────────────
+function toast(msg, type='success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = `show ${type}`;
+  setTimeout(() => el.className='', 3200);
+}
+
+// ── Utils ─────────────────────────────────────────────────────
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function cc(el, id) { document.getElementById(id).textContent = el.value.length; }
+function togglePin(id) { const i=document.getElementById(id); i.type = i.type==='password'?'text':'password'; }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function tick() {}
+
+// ── Navigation ────────────────────────────────────────────────
+function goPage(page, el) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  el.classList.add('active');
+  if (page==='users') loadUsers();
+  if (page==='profiles') loadProfiles();
+}
+
+// ── Load All ──────────────────────────────────────────────────
+async function loadAll() {
+  await Promise.allSettled([loadStats(), loadConfig(), loadProfiles(), loadCalls()]);
+}
+
+// ── Stats ─────────────────────────────────────────────────────
+async function loadStats() {
+  try {
+    const r = await apiFetch('GET','/api/stats');
+    if (!r.ok) return;
+    const s = await r.json();
+    document.getElementById('st-profiles').textContent = s.totalProfiles;
+    document.getElementById('st-calls').textContent = s.totalCalls;
+    document.getElementById('st-verified').textContent = s.verified;
+    document.getElementById('st-failed').textContent = s.failed;
+    document.getElementById('nb-profiles').textContent = s.totalProfiles;
+  } catch {}
+}
+
+// ── Config ────────────────────────────────────────────────────
+async function loadConfig() {
+  try {
+    const r = await apiFetch('GET','/api/config'); if(!r.ok) return;
+    const c = await r.json();
+    const set = (id, val) => { const el=document.getElementById(id); if(el) el.value=val||''; };
+    set('cfg-welcome', c.welcomeMessage); set('cfg-menu', c.menuPrompt);
+    set('cfg-account', c.accountPrompt); set('cfg-pin', c.pinPrompt);
+    set('cfg-inv-acct', c.invalidAccountMessage); set('cfg-inv-pin', c.invalidPinMessage);
+    set('cfg-final', c.invalidFinalMessage); set('cfg-attempts', c.maxAttempts);
+    [['cfg-welcome','wc'],['cfg-menu','mc'],['cfg-account','ac'],['cfg-pin','pc'],
+     ['cfg-inv-acct','iac'],['cfg-inv-pin','ipc'],['cfg-final','fc']].forEach(([f,s])=>{
+      const el=document.getElementById(f); if(el) document.getElementById(s).textContent=el.value.length;
+    });
+    document.getElementById('pv-welcome').textContent = c.welcomeMessage || '(not set)';
+    document.getElementById('pv-menu').textContent = c.menuPrompt || '(not set)';
+    document.getElementById('pv-account').textContent = c.accountPrompt || '(not set)';
+    document.getElementById('pv-pin').textContent = c.pinPrompt || '(not set)';
+  } catch {}
+}
+
+async function saveConfig() {
+  const g = id => document.getElementById(id).value;
+  try {
+    const r = await apiFetch('PUT','/api/config',{
+      welcomeMessage:g('cfg-welcome'), menuPrompt:g('cfg-menu'),
+      accountPrompt:g('cfg-account'), pinPrompt:g('cfg-pin'),
+      invalidAccountMessage:g('cfg-inv-acct'), invalidPinMessage:g('cfg-inv-pin'),
+      invalidFinalMessage:g('cfg-final'), maxAttempts:parseInt(g('cfg-attempts'))||3
+    });
+    if (r.ok) { toast('✅ Messages saved!'); loadConfig(); }
+    else toast('Error saving','error');
+  } catch { toast('Server not reachable','error'); }
+}
+
+// ── Profiles ──────────────────────────────────────────────────
+async function loadProfiles() {
+  try {
+    const r = await apiFetch('GET','/api/profiles'); if(!r.ok) return;
+    PROFILES = await r.json();
+    document.getElementById('nb-profiles').textContent = PROFILES.length;
+    renderProfiles();
+  } catch {}
+}
+
+function renderProfiles() {
+  const el = document.getElementById('profiles-wrap');
+  if (!PROFILES.length) { el.innerHTML='<div class="empty"><div class="ei">👤</div>No profiles yet. Click "New Profile" to get started.</div>'; return; }
+  el.innerHTML=`<table class="tbl">
+    <thead><tr><th>Name</th><th>Account #</th><th>PIN</th><th>Messages</th><th>Created</th><th></th></tr></thead>
+    <tbody>${PROFILES.map(p=>`<tr>
+      <td style="color:var(--text-bright);font-weight:700">${esc(p.name)}</td>
+      <td>${esc(p.accountNumber)}</td>
+      <td style="color:var(--yellow)">••••</td>
+      <td><span class="badge purple">${p.messages?.length||0} msg${(p.messages?.length||0)!==1?'s':''}</span></td>
+      <td style="color:var(--text-dim)">${new Date(p.createdAt).toLocaleDateString()}</td>
+      <td><div class="actions">
+        <button class="btn btn-ghost btn-xs" onclick="openDetail('${p.id}')">View / Edit</button>
+        <button class="btn btn-danger btn-xs" onclick="deleteProfile('${p.id}')">Del</button>
+      </div></td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+
+// Profile Modal (create/edit basic info)
+let editProfileId = null;
+function openProfileModal(id) {
+  editProfileId = id || null;
+  document.getElementById('pm-title').textContent = id ? 'Edit Profile' : 'New Profile';
+  if (id) {
+    const p = PROFILES.find(x=>x.id===id);
+    document.getElementById('pm-id').value = p.id;
+    document.getElementById('pm-name').value = p.name;
+    document.getElementById('pm-acct').value = p.accountNumber;
+    document.getElementById('pm-pin').value = p.pin;
+  } else {
+    ['pm-id','pm-name','pm-acct','pm-pin'].forEach(i=>document.getElementById(i).value='');
+  }
+  document.getElementById('profile-modal').classList.add('open');
+}
+
+async function saveProfile() {
+  const name=document.getElementById('pm-name').value.trim();
+  const accountNumber=document.getElementById('pm-acct').value.trim();
+  const pin=document.getElementById('pm-pin').value.trim();
+  if (!accountNumber) return toast('Account number required','error');
+  if (!pin) return toast('PIN required','error');
+  try {
+    let r;
+    if (editProfileId) r = await apiFetch('PUT',`/api/profiles/${editProfileId}`,{name,accountNumber,pin});
+    else r = await apiFetch('POST','/api/profiles',{name,accountNumber,pin});
+    const d = await r.json();
+    if (r.ok) { toast(editProfileId?'✅ Profile updated!':'✅ Profile created!'); closeModal('profile-modal'); loadProfiles(); }
+    else toast(d.error||'Error','error');
+  } catch { toast('Server error','error'); }
+}
+
+async function deleteProfile(id) {
+  if (!confirm('Delete this profile and all its messages?')) return;
+  try {
+    await apiFetch('DELETE',`/api/profiles/${id}`);
+    toast('Profile deleted'); loadProfiles();
+    if (DETAIL_PROFILE_ID===id) closeModal('detail-modal');
+  } catch { toast('Error','error'); }
+}
+
+// Profile Detail (messages)
+async function openDetail(id) {
+  DETAIL_PROFILE_ID = id;
+  const p = PROFILES.find(x=>x.id===id);
+  document.getElementById('dm-title').textContent = `${p.name} — Profile`;
+  renderDetail(p);
+  document.getElementById('detail-modal').classList.add('open');
+}
+
+function renderDetail(p) {
+  const msgs = p.messages || [];
+  document.getElementById('dm-body').innerHTML = `
+    <div class="profile-detail">
+      <div class="profile-meta">
+        <div class="meta-box"><div class="meta-lbl">Name</div><div class="meta-val">${esc(p.name)}</div></div>
+        <div class="meta-box"><div class="meta-lbl">Account Number</div><div class="meta-val">${esc(p.accountNumber)}</div></div>
+        <div class="meta-box"><div class="meta-lbl">PIN</div><div class="meta-val" style="color:var(--yellow)">••••••</div></div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <div style="font-size:13px;font-weight:700;color:var(--text-bright)">Personalized Messages <span style="color:var(--text-dim);font-size:11px;font-family:var(--mono)">(played in order)</span></div>
+        <button class="btn btn-primary btn-sm" onclick="openMsgModal('${p.id}')">＋ Add Message</button>
+      </div>
+      ${msgs.length === 0
+        ? '<div class="empty" style="padding:24px"><div class="ei">💬</div>No messages yet. Add one above.</div>'
+        : `<div class="msg-list">${msgs.map((m,i)=>`
+          <div class="msg-item">
+            <div class="msg-num">${i+1}</div>
+            <div class="msg-content">
+              <div class="msg-label">${esc(m.label||'Message')}</div>
+              <div class="msg-text">${esc(m.text)}</div>
+            </div>
+            <div class="msg-actions">
+              <button class="btn btn-ghost btn-xs" onclick="openMsgModal('${p.id}','${m.id}')">Edit</button>
+              <button class="btn btn-danger btn-xs" onclick="deleteMessage('${p.id}','${m.id}')">✕</button>
+            </div>
+          </div>`).join('')}
+        </div>`}
+      <div class="divider"></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost btn-sm" onclick="openProfileModal('${p.id}');closeModal('detail-modal')">Edit Account Info</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteProfile('${p.id}')">Delete Profile</button>
+      </div>
+    </div>`;
+}
+
+// Messages
+let editMsgId = null;
+function openMsgModal(profileId, msgId) {
+  editMsgId = msgId || null;
+  document.getElementById('mm-profile-id').value = profileId;
+  document.getElementById('mm-msg-id').value = msgId || '';
+  document.getElementById('mm-title').textContent = msgId ? 'Edit Message' : 'Add Message';
+  if (msgId) {
+    const p = PROFILES.find(x=>x.id===profileId);
+    const m = p?.messages?.find(x=>x.id===msgId);
+    if (m) { document.getElementById('mm-label').value=m.label||''; document.getElementById('mm-text').value=m.text||''; document.getElementById('mm-c').textContent=m.text?.length||0; }
+  } else {
+    document.getElementById('mm-label').value=''; document.getElementById('mm-text').value=''; document.getElementById('mm-c').textContent=0;
+  }
+  document.getElementById('msg-modal').classList.add('open');
+}
+
+async function saveMessage() {
+  const profileId = document.getElementById('mm-profile-id').value;
+  const msgId = document.getElementById('mm-msg-id').value;
+  const label = document.getElementById('mm-label').value.trim();
+  const text = document.getElementById('mm-text').value.trim();
+  if (!text) return toast('Message text is required','error');
+  try {
+    let r;
+    if (msgId) r = await apiFetch('PUT',`/api/profiles/${profileId}/messages/${msgId}`,{label,text});
+    else r = await apiFetch('POST',`/api/profiles/${profileId}/messages`,{label,text});
+    const d = await r.json();
+    if (r.ok) {
+      toast(msgId?'✅ Message updated!':'✅ Message added!');
+      closeModal('msg-modal');
+      await loadProfiles();
+      const p = PROFILES.find(x=>x.id===profileId);
+      if (p && DETAIL_PROFILE_ID===profileId) renderDetail(p);
+    } else toast(d.error||'Error','error');
+  } catch { toast('Server error','error'); }
+}
+
+async function deleteMessage(profileId, msgId) {
+  if (!confirm('Delete this message?')) return;
+  try {
+    await apiFetch('DELETE',`/api/profiles/${profileId}/messages/${msgId}`);
+    toast('Message deleted');
+    await loadProfiles();
+    const p = PROFILES.find(x=>x.id===profileId);
+    if (p) renderDetail(p);
+  } catch { toast('Error','error'); }
+}
+
+// ── Call Log ──────────────────────────────────────────────────
+async function loadCalls() {
+  try {
+    const r = await apiFetch('GET','/api/calls'); if(!r.ok) return;
+    const calls = await r.json();
+    document.getElementById('nb-calls').textContent = calls.length;
+    const el = document.getElementById('calls-wrap');
+    if (!calls.length) { el.innerHTML='<div class="empty"><div class="ei">📵</div>No calls yet</div>'; return; }
+    const evtBadge = e => ({
+      inbound: ['info','📲 Inbound'], pin_verified: ['success','✅ Verified'],
+      pin_failed: ['fail','❌ PIN Fail'], account_found: ['info','🏦 Account OK'],
+      account_not_found: ['warn','⚠️ No Account']
+    }[e] || ['info',e]);
+    el.innerHTML=`<table class="tbl">
+      <thead><tr><th>Time</th><th>From</th><th>Event</th><th>Caller</th><th>Account</th><th>Details</th></tr></thead>
+      <tbody>${calls.map(c=>{const[bc,bl]=evtBadge(c.event);return`<tr>
+        <td style="color:var(--text-dim)">${new Date(c.timestamp).toLocaleString()}</td>
+        <td>${esc(c.from||'—')}</td>
+        <td><span class="badge ${bc}">${bl}</span></td>
+        <td>${esc(c.callerName||'—')}</td>
+        <td>${esc(c.accountNumber||'—')}</td>
+        <td style="color:var(--text-dim)">${esc(c.status||'—')}</td>
+      </tr>`}).join('')}</tbody>
+    </table>`;
+  } catch {}
+}
+
+// ── Admin Users ───────────────────────────────────────────────
+async function loadUsers() {
+  try {
+    const r = await apiFetch('GET','/api/users'); if(!r.ok) return;
+    const users = await r.json();
+    const el = document.getElementById('users-wrap');
+    if (!users.length) { el.innerHTML='<div class="empty"><div class="ei">🔑</div>No users</div>'; return; }
+    el.innerHTML=`<table class="tbl">
+      <thead><tr><th>Username</th><th>Role</th><th>Created</th><th></th></tr></thead>
+      <tbody>${users.map(u=>`<tr>
+        <td style="color:var(--text-bright);font-weight:700">${esc(u.username)}</td>
+        <td><span class="badge ${u.role==='superadmin'?'purple':'info'}">${u.role}</span></td>
+        <td style="color:var(--text-dim)">${new Date(u.createdAt).toLocaleDateString()}</td>
+        <td><div class="actions">
+          ${u.role!=='superadmin'?`<button class="btn btn-danger btn-xs" onclick="deleteUser('${u.id}')">Delete</button>`:'<span style="color:var(--text-dim);font-size:10px;font-family:var(--mono)">protected</span>'}
+        </div></td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  } catch {}
+}
+
+let editUserId = null;
+function openUserModal() {
+  editUserId = null;
+  document.getElementById('um-title').textContent = 'Add Admin User';
+  ['um-id','um-username','um-password'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('user-modal').classList.add('open');
+}
+
+async function saveUser() {
+  const username = document.getElementById('um-username').value.trim();
+  const password = document.getElementById('um-password').value;
+  const role = document.getElementById('um-role').value;
+  if (!username) return toast('Username required','error');
+  if (!password) return toast('Password required','error');
+  try {
+    const r = await apiFetch('POST','/api/users',{username,password,role});
+    const d = await r.json();
+    if (r.ok) { toast('✅ User created!'); closeModal('user-modal'); loadUsers(); }
+    else toast(d.error||'Error','error');
+  } catch { toast('Server error','error'); }
+}
+
+async function deleteUser(id) {
+  if (!confirm('Delete this admin user?')) return;
+  try {
+    const r = await apiFetch('DELETE',`/api/users/${id}`);
+    if (r.ok) { toast('User deleted'); loadUsers(); }
+  } catch { toast('Error','error'); }
+}
+
+// ── Boot ──────────────────────────────────────────────────────
+tryAutoLogin();
+</script>
+</body>
+</html>

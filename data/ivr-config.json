@@ -1,0 +1,10 @@
+{
+  "welcomeMessage": "Welcome to MEDUSA. Please listen carefully to the following options.",
+  "menuPrompt": "For account information, press 1.",
+  "accountPrompt": "Please enter your account number followed by the pound key.",
+  "pinPrompt": "Please enter your PIN followed by the pound key.",
+  "invalidAccountMessage": "We could not find that account number. Please try again.",
+  "invalidPinMessage": "Incorrect PIN. Please try again.",
+  "invalidFinalMessage": "We were unable to verify your information. Please call back during business hours. Goodbye.",
+  "maxAttempts": 3
+}
